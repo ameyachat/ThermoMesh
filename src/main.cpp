@@ -4,29 +4,56 @@
 
 Adafruit_BME280 bme;
 
+SemaphoreHandle_t dataMutex;
+float temperature, humidity, pressure;
+
+void sensorTask(void *pvParameters) {
+  while (1) {
+    float t = bme.readTemperature();
+    float h = bme.readHumidity();
+    float p = bme.readPressure() / 100.0F;
+
+    xSemaphoreTake(dataMutex, portMAX_DELAY);
+    temperature = t;
+    humidity = h;
+    pressure = p;
+    xSemaphoreGive(dataMutex);
+
+    vTaskDelay(pdMS_TO_TICKS(2000));
+  }
+}
+
+void printTask(void *pvParameters) {
+  while (1) {
+    xSemaphoreTake(dataMutex, portMAX_DELAY);
+    float t = temperature;
+    float h = humidity;
+    float p = pressure;
+    xSemaphoreGive(dataMutex);
+
+    Serial.println("---");
+    Serial.printf("Temperature: %.2f C\n", t);
+    Serial.printf("Humidity: %.2f %%\n", h);
+    Serial.printf("Pressure: %.2f hPa\n", p);
+
+    vTaskDelay(pdMS_TO_TICKS(3000));
+  }
+}
+
 void setup() {
   Serial.begin(115200);
-  
+
   if (!bme.begin(0x76)) {
-    Serial.println("Could not find BME280 sensor!");
+    Serial.println("BME280 not found!");
     while (1);
   }
-  Serial.println("BME280 found!");
+
+  dataMutex = xSemaphoreCreateMutex();
+
+  xTaskCreatePinnedToCore(sensorTask, "SensorTask", 2048, NULL, 1, NULL, 1);
+  xTaskCreatePinnedToCore(printTask, "PrintTask", 2048, NULL, 1, NULL, 1);
 }
 
 void loop() {
-  Serial.print("Temperature: ");
-  Serial.print(bme.readTemperature());
-  Serial.println(" °C");
-  
-  Serial.print("Humidity: ");
-  Serial.print(bme.readHumidity());
-  Serial.println(" %");
-  
-  Serial.print("Pressure: ");
-  Serial.print(bme.readPressure() / 100.0F);
-  Serial.println(" hPa");
-  
-  Serial.println("---");
-  delay(2000);
+  vTaskDelete(NULL);
 }
