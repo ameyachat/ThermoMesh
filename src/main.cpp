@@ -2,6 +2,8 @@
 #include <Wire.h>
 #include <Adafruit_BME280.h>
 
+#define LED_PIN 2
+
 Adafruit_BME280 bme;
 
 SemaphoreHandle_t dataMutex;
@@ -40,6 +42,16 @@ void printTask(void *pvParameters) {
   }
 }
 
+void ledTask(void *pvParameters) {
+  pinMode(LED_PIN, OUTPUT);
+  while (1) {
+    digitalWrite(LED_PIN, HIGH);
+    vTaskDelay(pdMS_TO_TICKS(500));
+    digitalWrite(LED_PIN, LOW);
+    vTaskDelay(pdMS_TO_TICKS(500));
+  }
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -52,6 +64,7 @@ void setup() {
 
   xTaskCreatePinnedToCore(sensorTask, "SensorTask", 2048, NULL, 1, NULL, 1);
   xTaskCreatePinnedToCore(printTask, "PrintTask", 2048, NULL, 1, NULL, 1);
+  xTaskCreatePinnedToCore(ledTask, "LedTask", 1024, NULL, 1, NULL, 1);
 }
 
 void loop() {
